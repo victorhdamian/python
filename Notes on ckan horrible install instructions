@@ -1,0 +1,96 @@
+ref.:
+http://docs.ckan.org/en/latest/maintaining/installing/install-from-package.html
+https://github.com/eeeschwartz/erikschwartz/blob/master/_posts/2014-08-30-install-ckan-from-ubuntu-package.md
+
+
+#check pythonversion and install dependencies
+python -V
+sudo apt-get update
+sudo apt-get install wget
+sudo apt-get install python-pastescript
+sudo apt-get install python-pip
+pip install fantastic
+sudo apt-get install -y nginx apache2 libapache2-mod-wsgi libpq5
+cd /tmp
+wget http://packaging.ckan.org/python-ckan_2.5-trusty_amd64.deb
+sudo dpkg -i python-ckan_2.5-trusty_amd64.deb
+sudo apt-get install -y postgresql solr-jetty
+
+
+#config ckan
+sudo vi /etc/ckan/default/production.ini
+#uncomment and set
+ckan.site_id = default
+ckan.site_url = http://demo.ckan.org
+
+#config jetty
+sudo vi /etc/default/jetty
+#uncomment and set
+NO_START=0            # (line 4)
+JETTY_HOST=127.0.0.1  # (line 16)
+JETTY_PORT=8983       # (line 19)
+JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 # (line 31)
+
+sudo service jetty start
+
+#configure solr
+sudo mv /etc/solr/conf/schema.xml /etc/solr/conf/schema.xml.bak
+sudo ln -s /usr/lib/ckan/default/src/ckan/ckan/config/solr/schema.xml /etc/solr/conf/schema.xml
+
+sudo service jetty restart
+
+#update ckan conf 
+sudo vi /etc/ckan/default/production.ini
+#uncomment and set
+solr_url=http://127.0.0.1:8983/solr
+
+sudo service jetty restart
+
+#set up ckan_default db ! take note of the password you enter
+sudo -u postgres psql -l
+sudo -u postgres createuser -S -D -R -P ckan_default
+sudo -u postgres createdb -O ckan_default ckan_default -E utf-8
+
+#update ckan conf with sqlalchemy
+sudo vi /etc/ckan/default/production.ini
+#uncomment and set
+sqlalchemy.url = postgresql://ckan_default:<password_you_entered_in_prior_step>@localhost/ckan_default
+
+sudo ckan db init
+
+#update ckan conf with datastore plugin
+sudo vi /etc/ckan/default/production.ini
+#uncomment and set
+ckan.plugins = <list of plugins> datastore
+
+#set up datastore_default db ! take note of the password you enter
+sudo -u postgres createuser -S -D -R -P -l datastore_default
+sudo -u postgres createdb -O ckan_default datastore_default -E utf-8
+
+#update ckan conf with datastore read write urls
+sudo vi /etc/ckan/default/production.ini
+#uncomment and set
+ckan.datastore.write_url = postgresql://ckan_default:<password_you_entered_in_prior_step>@localhost/datastore_default
+ckan.datastore.read_url = postgresql://datastore_default:<password_you_entered_in_prior_step>@localhost/datastore_default
+
+#start python VM and init db
+. /usr/lib/ckan/default/bin/activate
+cd /usr/lib/ckan/default/src/ckan
+paster db init -c /etc/ckan/default/production.ini
+
+#link to who.ini
+sudo mkdir -p /etc/ckan/default
+sudo chown -R `whoami` /etc/ckan/
+ln -s /usr/lib/ckan/default/src/ckan/who.ini /etc/ckan/default/who.ini
+
+#restart everything
+sudo service jetty restart
+sudo service apache2 restart
+sudo service nginx restart
+
+#start ckan site
+cd /usr/lib/ckan/default/src/ckan
+paster serve /etc/ckan/default/production.ini
+
+
+
