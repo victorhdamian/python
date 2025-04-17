@@ -31,3 +31,4 @@ s = "life is an adventure"
 print(reverseWords_new_array(s))
 print(reverseWords_swap_in_place(s))
 print(reverseWordsPY(s))
+print(" ".join(reversed(s.split())))
